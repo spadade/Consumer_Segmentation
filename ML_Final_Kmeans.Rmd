@@ -1,0 +1,243 @@
+---
+title: "Machine Learning K means and Heirarchical Clustering"
+author: "Srushti Padade"
+date: "12/4/2019"
+output: html_document
+---
+
+Problem Statement:
+
+CRISA has traditionally segmented markets on the basis of purchaser demographics. They would now like to
+segment the market based on two key sets of variables more directly related to the purchase process and to
+brand loyalty:
+1. Purchase behavior (volume, frequency, susceptibility to discounts, and brand loyalty)
+2. Basis of purchase (price, selling proposition)
+Doing so would allow CRISA to gain information about what demographic attributes are associated with
+different purchase behaviors and degrees of brand loyalty, and thus deploy promotion budgets more
+effectively. More effective market segmentation would enable CRISA’s clients (in this case, a firm called IMRB)
+to design more cost-effective promotions targeted at appropriate segments. Thus, multiple promotions could be
+launched, each targeted at different market segments at different times of the year. This would result in a more
+cost-effective allocation of the promotion budget to different market segments. It would also enable IMRB to
+design more effective customer reward systems and thereby increase brand loyalty
+
+Libraries used
+
+```{r}
+library(dplyr)
+library(ISLR)
+library(caret)
+library(factoextra)
+library(GGally)
+```
+
+Reading the data file and removing the % sign from the data - Data cleaning.
+
+```{r}
+BathSoap <- read.csv("BathSoap.csv")
+
+BathSoapData <- data.frame(sapply(BathSoap, function(x) as.numeric(gsub("%", "", x))))
+```
+
+Question 1. Use k-means clustering to identify clusters of households based on:
+
+a. The variables that describe purchase behavior (including brand loyalty)
+
+b. The variables that describe the basis for purchase
+
+c. The variables that describe both purchase behavior and basis of purchase
+
+Note 1: How should k be chosen? Think about how the clusters would be used. It is likely that the
+marketing efforts would support two to five different promotional approaches.
+Note 2: How should the percentages of total purchases comprised by various brands be treated? Isn’t
+a customer who buys all brand A just as loyal as a customer who buys all brand B? What will be the
+effect on any distance measure of using the brand share variables as is? Consider using a single
+derived variable.
+
+2. Select what you think is the best segmentation and comment on the characteristics (demographic,
+brand loyalty, and basis for purchase) of these clusters. (This information would be used to guide the
+development of advertising and promotional campaigns.)
+
+3. Develop a model that classifies the data into these segments. Since this information would most likely
+be used in targeting direct-mail promotions, it would be useful to select a market segment that would be
+defined as a success in the classification model.
+
+Solution:
+
+For computing the brand loyalty we have used the data related to the branded purchase based on the Purchase percentage on the Brand code by the customer and then finding the maximum brand loyal percentage and comparing with the other 999 brand purchase.
+
+This calculation can tell us that if customer is loyal to a brand then the Max Brand percentage is higher than that of the Other brand purchase. Hence this determines the loyalty of the Customer towards the brand.
+
+```{r}
+Loyal <- BathSoapData[,23:31]
+
+Loyal$MaxBrand <- apply(Loyal,1,max)
+
+BrandLoyalty <- cbind(BathSoapData[,c(19, 13, 15, 12, 31, 14, 16,20)], MaxLoyal = Loyal$MaxBrand)
+
+BrandLoyalty <- scale(BrandLoyalty)
+View(BrandLoyalty)
+```
+
+The kmeans clustering model is applied to the attributes that amy determine brand loyalty with k = 2 so we can cluster them as "Brand Loyal Customer" and "Not Brand Loyal Customers".
+
+```{r}
+K_model_Brand <- kmeans(BrandLoyalty, centers = 2, nstart = 25)
+
+BrandLoyalty <- cbind(BrandLoyalty, Cluster = K_model_Brand$cluster)
+
+fviz_cluster(K_model_Brand, data = BrandLoyalty)
+```
+
+Here, customers of cluster 1 are Brand Loyal whereas Cluster 2 customer are not so concerned about brands, thus are brand disloyal. 
+
+But similarly if we determine to cluster them based on the k = 4 we get below clusters.
+
+```{r}
+K_model_Brand <- kmeans(BrandLoyalty, centers = 4, nstart = 25)
+
+BrandLoyalty_4 <- cbind(BrandLoyalty[,-10], Cluster = K_model_Brand$cluster)
+
+fviz_cluster(K_model_Brand, data = BrandLoyalty_4)
+```
+
+Lets consider the data for the Purchase behaviour of the customers.
+
+Selling Proposition:
+
+Here we have considered all the selling propositions and have taken the maximum among all the propositions and taken a comparision to showcase which are the effective preposition to be considered for the Model.
+
+```{r}
+SellingProposition <- BathSoapData[,36:46]
+
+SellingProposition$Max <- apply(SellingProposition,1,max)
+SellingProposition$MaxBrand <- colnames(SellingProposition)[apply(SellingProposition,1,which.max)]
+
+table(SellingProposition$MaxBrand)
+```
+
+Similarly, for the Price Catagories catogories.
+
+```{r}
+PriceCatg <- BathSoapData[,32:35]
+PriceCatg$Max <- apply(PriceCatg,1,max)
+PriceCatg$MaxBrand <- colnames(PriceCatg)[apply(PriceCatg,1,which.max)]
+
+table(PriceCatg$MaxBrand)
+```
+
+Also same is for Promotions.
+
+```{r}
+Promotion <- BathSoapData[,20:22]
+Promotion$Max <- apply(Promotion,1,max)
+Promotion$MaxBrand <- colnames(Promotion)[apply(Promotion,1,which.max)]
+
+table(Promotion$MaxBrand)
+```
+
+Thus considering the effect of each Selling Proposition we have considered only the highers ones.
+Similarly for Promotions and Price Catagories.
+
+```{r}
+PurchaseBehaviour <- BathSoapData[,c(32,33,34,35,36,45)]
+PurchaseBehaviour <- scale(PurchaseBehaviour)
+View(PurchaseBehaviour)
+
+fviz_nbclust(PurchaseBehaviour, kmeans, method = "silhouette")
+```
+
+Computing the K means Clustering model for the checking on the purchasing pattern of the customer.
+Here we are using k = 4.
+
+```{r}
+K_model_Purchase <- kmeans(PurchaseBehaviour, centers = 4, nstart = 25)
+
+PurchaseBehaviour <- cbind(PurchaseBehaviour, Cluster = K_model_Purchase$cluster)
+View(PurchaseBehaviour)
+
+fviz_cluster(K_model_Purchase, data = PurchaseBehaviour)
+```
+
+Now, we have to consider the customers with respect to both Brand loyalty as well as Purchase Behaviour and computing a model.
+
+```{r}
+LoyalPurchase <- cbind(BrandLoyalty[,-10], PurchaseBehaviour[,-7])
+
+fviz_nbclust(LoyalPurchase, kmeans, method = "silhouette")
+
+K_model_All <- kmeans(LoyalPurchase, centers = 4, nstart = 25)
+```
+
+While plotting the model for k = 4 and k = 5 we can find the aspects are concluded with using 4 cluster itself without drawing another 1 cluster.
+Hence we are using here k = 4.
+
+```{r}
+LoyalPurchase <- cbind(LoyalPurchase, Cluster = as.data.frame(K_model_All$cluster))
+clusters <- matrix(c("1","2","3","4"),nrow = 4)
+LoyalPurchase_Centroids <- cbind(clusters,as.data.frame(K_model_All$centers))
+
+ggparcoord(LoyalPurchase_Centroids,
+           columns = 2:16, groupColumn = 1,
+           showPoints = TRUE, 
+           title = "Parallel Coordinate Plot for for Bathsoap Data - K = 4",
+           alphaLines = 0.5)
+```
+
+Computing the Demographic result for the each clusters.
+
+Here we are just trying to interpret the demographics values of each clusters.
+
+```{r}
+Demographics <-cbind(BathSoapData[,2:11], ClusterVal = K_model_All$cluster)
+
+Centroid_1 <- colMeans(Demographics[Demographics$ClusterVal == "1",])
+Centroid_2 <- colMeans(Demographics[Demographics$ClusterVal == "2",])
+Centroid_3 <- colMeans(Demographics[Demographics$ClusterVal == "3",])
+Centroid_4 <- colMeans(Demographics[Demographics$ClusterVal == "4",])
+
+Centroid_all <- rbind(Centroid_1, Centroid_2, Centroid_3, Centroid_4)
+
+ggparcoord(Centroid_all,
+           columns = c(1,5,6,7,8), groupColumn = 11,
+           showPoints = TRUE, 
+           title = "Parallel Coordinate Plot of Demographic measures for Bathsoap Data - K = 4",
+           alphaLines = 0.5)
+```
+
+There are few attributes that are catagorical hence we are presenting it in a barplot.
+
+* Plotting the Frequency of Eating Habit(Vegetarian, Vegetarian who eat eggs, Non vegetarian, Not Specified):
+
+```{r}
+barplot(table(BathSoapData$FEH,K_model_All$cluster), xlab = "Clusters", ylab = "Frequency of Eating Habit", main = "Frequency of Eating Habit for each Cluster")
+```
+
+* Plotting the Frequency of Gender(NA, Male, Female):
+
+```{r}
+barplot(table(BathSoapData$SEX,K_model_All$cluster), xlab = "Clusters", ylab = "Frequency of Gender", main = "Frequency of Gender for each cluster")
+```
+
+The female population have higher rate of purchase where female from cluster 1 and 2 have higher females.
+
+Plotting the Frequency of Television availability(Unspecified, Avaliablity, Not Avaliable):
+
+```{r}
+barplot(table(BathSoapData$CS, K_model_All$cluster), xlab = "Clusters", ylab = "Frequency of Television availability", main = "Frequency of Television avaliablity for each cluster")
+```
+
+Mostly all the customers have Television so have a promotional offer over television can be helpful for attracting the customers.
+
+Also it is seen that the Selling Proposition is high for one with code 5 and 14. Henec these are good perpositions and can be used in future.
+
+Similarly,
+Price Catagory 1 and 2 have good response thus those also can be used in future again to gain customers atention.
+
+Also the education level of customers in cluster 1 is higher so we can say that they have a good job and thus email are been checked often thus Promotions can be mailed.
+
+Now if we consider the remedition for the better profit for the Soaps to be sold it can be said that the Cluster 3 have brand loyal customers, So any promotional offers over Branded Soaps can be sent to the Cluster 3 Customers.
+
+Similarly, Cluster 4 Customers are not much concern about the Promotional offers but the sales for them are still high, thus sending an promotional email to these customers would not help us gain much profit 
+Rather the Cluster 1 who purchase over the promotions are more and the mail target should be them.
+
+The range of the profit can be gained more where Average Price is higher. Thus the Cluster 3 customers can be focused toward providing the mail with high priced items for the recommemdations.
