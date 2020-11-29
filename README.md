@@ -1,4 +1,4 @@
-# Consumer_Segmentation_MachineLeaningProject
+# Consumer Segmentation
 
 ## Business Situation
 
